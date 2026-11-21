@@ -1,29 +1,27 @@
 @echo off
-chcp 65001 >nul
-title Game Pay - GitHub Auto Sync
+setlocal
 echo ========================================================
-echo        GAME PAY - مزامنة التعديلات مع GITHUB
+echo        GAME PAY - GITHUB AUTO SYNC
 echo ========================================================
 echo.
-echo [1/3] فحص وإضافة كافة الملفات والتعديلات...
+echo [1/3] Staging changes...
 git add .
 
-echo [2/3] حفظ التعديلات بختم زمني تلقائي...
-set "commit_msg=تحديث تلقائي: %date% - %time%"
+echo [2/3] Committing changes...
 git diff --cached --quiet
-if %errorlevel% neq 0 (
-    git commit -m "%commit_msg%"
+if errorlevel 1 (
+    git commit -m "Auto-sync update: %DATE% %TIME%"
 ) else (
-    echo لا توجد تعديلات جديدة للحفظ.
+    echo No new changes to commit.
 )
 
-echo [3/3] رفع التعديلات مباشرة إلى المستودع الرئيسي (main)...
+echo [3/3] Pushing to GitHub (main)...
 git push origin main
 
 echo.
 echo ========================================================
-echo  ✓ تمت المزامنة بنجاح مع:
-echo    https://github.com/mohamedluttfyoffical/game-pay-store
+echo  SUCCESS: Synchronized with GitHub repository:
+echo  https://github.com/mohamedluttfyoffical/game-pay-store
 echo ========================================================
 echo.
-timeout /t 5
+if "%~1"=="" pause
