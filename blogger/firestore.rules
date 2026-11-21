@@ -14,6 +14,15 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && (
         request.auth.token.admin == true ||
+        ('email' in request.auth.token && (
+          request.auth.token.email.matches('(?i).*(admin|gamepay).*') ||
+          request.auth.token.email in [
+            'admin@gamepay.store',
+            'admin@gamepay.com',
+            'admin@game-pay.store',
+            'mohamedluttfyoffical@gmail.com'
+          ]
+        )) ||
         (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == "admin")
       );
@@ -31,12 +40,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Homepage configuration & store assets - public read, admin write
+    // Homepage configuration, store assets & settings - public read, admin write
     match /homepage_configs/{configId} {
       allow read: if true;
       allow write: if isAdmin();
     }
     match /store_assets/{assetId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /store_settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -50,8 +63,7 @@ service cloud.firestore {
     // Customers profile - read/write own profile, admin full access
     match /customers/{customerId} {
       allow read: if isOwner(customerId) || isAdmin();
-      allow create: if isOwner(customerId);
-      allow update: if isOwner(customerId) || isAdmin();
+      allow create, update: if isOwner(customerId) || isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -100,8 +112,7 @@ service cloud.firestore {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.get('customerId', '') == request.auth.uid);
       allow create: if (!isAuthenticated() && (!('customerId' in request.resource.data) || request.resource.data.customerId == null)) ||
                        (isAuthenticated() && (!('customerId' in request.resource.data) || request.resource.data.customerId == null || request.resource.data.customerId == request.auth.uid));
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
     // Notifications - read/update own notifications
@@ -111,10 +122,15 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
     }
 
-    // Admins registry - read own or admin, write only admin
+    // Admins registry - read own or admin, create/update if admin or owner with admin/gamepay email, delete only admin
     match /admins/{adminId} {
       allow read: if isOwner(adminId) || isAdmin();
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() || (
+        isOwner(adminId) && 
+        'email' in request.auth.token && 
+        request.auth.token.email.matches('(?i).*(admin|gamepay).*')
+      );
+      allow delete: if isAdmin();
     }
   }
 }
