@@ -74,9 +74,9 @@ export function AuthPage({ mode }: { mode: "login" | "register" | "forgot-passwo
       if (!termsAccepted) return toast.error("يرجى الموافقة على شروط وسياسة المنصة للمتابعة.");
       register.mutate({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
     } else if (forgot) {
-      const loginId = identifier.trim() || email.trim();
-      if (!loginId) return toast.error("يرجى إدخال البريد الإلكتروني أو رقم الهاتف.");
-      resetMutation.mutate({ identifier: loginId });
+      const emailToReset = email.trim() || identifier.trim();
+      if (!emailToReset || !emailToReset.includes("@")) return toast.error("يرجى إدخال بريد إلكتروني صحيح.");
+      resetMutation.mutate({ email: emailToReset });
     } else {
       const loginId = identifier.trim() || email.trim();
       if (!loginId) return toast.error("يرجى إدخال البريد الإلكتروني أو رقم الهاتف.");
@@ -117,7 +117,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" | "forgot-passwo
           </h2>
           {forgot && (
             <p className="mt-3 text-sm leading-7 text-slate-400">
-              أدخل بريدك الإلكتروني أو رقم هاتفك وسنرسل لك رابط استعادة كلمة المرور.
+              أدخل بريدك الإلكتروني المسجّل وسنرسل لك رابط استعادة كلمة المرور.
             </p>
           )}
 
@@ -139,7 +139,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" | "forgot-passwo
               </label>
             )}
 
-            {creating ? (
+            {creating || forgot ? (
               <label className="field-label">
                 البريد الإلكتروني
                 <div className="relative">

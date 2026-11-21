@@ -2038,7 +2038,7 @@ function viewAuth(mode = 'login') {
           <h2 class="mt-4 text-3xl font-black text-white">${isForgot ? 'نسيت كلمة المرور؟' : isRegister ? 'أنشئ حسابك' : 'مرحبًا بعودتك'}</h2>
           ${isForgot ? `
             <p class="mt-3 text-sm leading-7 text-slate-400">
-              أدخل بريدك الإلكتروني أو رقم هاتفك وسنرسل لك رابط استعادة كلمة المرور.
+              أدخل بريدك الإلكتروني المسجّل وسنرسل لك رابط استعادة كلمة المرور.
             </p>
           ` : ''}
 
@@ -2052,7 +2052,7 @@ function viewAuth(mode = 'login') {
               </label>
             ` : ''}
 
-            ${isRegister ? `
+            ${isRegister || isForgot ? `
               <label class="field-label">البريد الإلكتروني
                 <div class="relative">
                   <i data-lucide="mail" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
@@ -2195,8 +2195,9 @@ function handleAuthSubmit(e, mode) {
   const rememberMe = document.getElementById('authRememberMe')?.checked ?? true;
 
   if (mode === 'forgot-password') {
-    if (!rawIdentifier) {
-      showToast('يرجى إدخال البريد الإلكتروني أو رقم الهاتف.', 'error');
+    const email = rawIdentifier.toLowerCase();
+    if (!email || !email.includes('@')) {
+      showToast('يرجى إدخال بريد إلكتروني صحيح.', 'error');
       return;
     }
     const btn = document.getElementById('authSubmitBtn');
@@ -2215,12 +2216,11 @@ function handleAuthSubmit(e, mode) {
     }
     setLoading(true);
 
-    const isEmail = rawIdentifier.includes('@');
-    const sendReset = (targetEmail) => {
-      auth.sendPasswordResetEmail(targetEmail)
+    if (isFirebaseActive && auth) {
+      auth.sendPasswordResetEmail(email)
         .then(() => {
           setLoading(false);
-          const masked = targetEmail.replace(/(.{2})(.*)(?=@)/, '$1***');
+          const masked = email.replace(/(.{2})(.*)(?=@)/, '$1***');
           showToast(`تم إرسال رابط استعادة كلمة المرور إلى البريد: ${masked}`, 'success');
         })
         .catch(err => {
@@ -2230,34 +2230,6 @@ function handleAuthSubmit(e, mode) {
           else if (err.code === 'auth/invalid-email') msg = 'صيغة البريد الإلكتروني غير صحيحة.';
           showToast(msg, 'error');
         });
-    };
-
-    if (isFirebaseActive && auth) {
-      if (isEmail) {
-        sendReset(rawIdentifier.toLowerCase());
-      } else {
-        if (db) {
-          const keys = getPhoneLookupKeys(rawIdentifier);
-          Promise.all(keys.map(k => db.collection('phone_lookup').doc(k).get().catch(() => null)))
-            .then(snapshots => {
-              const matchedSnap = snapshots.find(snap => snap && snap.exists && snap.data() && snap.data().email);
-              if (matchedSnap) {
-                sendReset(matchedSnap.data().email);
-              } else {
-                setLoading(false);
-                showToast('لا يوجد حساب مسجل برقم الهاتف هذا.', 'error');
-              }
-            })
-            .catch(err => {
-              console.error('Phone lookup reset error:', err);
-              setLoading(false);
-              showToast('حدث خطأ أثناء فحص رقم الهاتف.', 'error');
-            });
-        } else {
-          setLoading(false);
-          showToast('لا يوجد حساب مسجل برقم الهاتف هذا.', 'error');
-        }
-      }
     } else {
       setTimeout(() => {
         setLoading(false);

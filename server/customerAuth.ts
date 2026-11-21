@@ -108,28 +108,22 @@ export const customerAuthRouter = router({
     return publicCustomer(customer);
   }),
   requestPasswordReset: publicProcedure.input(z.object({
-    identifier: z.string().trim().min(1, "يرجى إدخال البريد الإلكتروني أو رقم الهاتف").max(320),
+    email: z.string().trim().toLowerCase().max(320).optional(),
+    identifier: z.string().trim().max(320).optional(),
   })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "قاعدة البيانات غير متاحة." });
-    const rawIdentifier = input.identifier.trim();
-    const isEmail = rawIdentifier.includes("@");
-    let customer: Customer | undefined;
-    if (isEmail) {
-      const [res] = await db.select().from(customers).where(eq(customers.email, rawIdentifier.toLowerCase())).limit(1);
-      customer = res;
-    } else {
-      const keys = getPhoneLookupKeys(rawIdentifier);
-      const [res] = await db.select().from(customers).where(inArray(customers.phone, keys)).limit(1);
-      customer = res;
+    const targetEmail = (input.email || input.identifier || "").trim().toLowerCase();
+    if (!targetEmail || !targetEmail.includes("@")) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "يرجى إدخال بريد إلكتروني صحيح." });
     }
+    const [customer] = await db.select().from(customers).where(eq(customers.email, targetEmail)).limit(1);
     if (!customer) {
-      throw new TRPCError({ code: "NOT_FOUND", message: isEmail ? "لا يوجد حساب مسجل بهذا البريد الإلكتروني." : "لا يوجد حساب مسجل برقم الهاتف هذا." });
+      throw new TRPCError({ code: "NOT_FOUND", message: "لا يوجد حساب مسجل بهذا البريد الإلكتروني." });
     }
-    const masked = customer.email.replace(/(.{2})(.*)(?=@)/, '$1***');
     return {
       success: true,
-      message: `تم إرسال تعليمات إعادة تعيين كلمة المرور إلى البريد: ${masked}`,
+      message: "تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني بنجاح.",
     };
   }),
   logout: publicProcedure.mutation(async ({ ctx }) => {
