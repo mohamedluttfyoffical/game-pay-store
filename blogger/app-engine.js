@@ -1995,9 +1995,9 @@ function handleAuthSubmit(e, mode) {
           Store.user = userObj;
           Store.saveUser();
 
-          // Save user fields to collection 'users' in Firestore
+          // Save customer profile and initial 0.00 wallet in Firestore
           if (db) {
-            const userData = {
+            const customerData = {
               id: cred.user.uid,
               uid: cred.user.uid,
               name,
@@ -2008,11 +2008,7 @@ function handleAuthSubmit(e, mode) {
               createdAt: new Date().toISOString()
             };
 
-            // 1. Save to 'users' collection as requested
-            db.collection('users').doc(cred.user.uid).set(userData).catch(console.error);
-
-            // 2. Also keep 'customers' & 'customer_wallets' synced
-            db.collection('customers').doc(cred.user.uid).set(userData).catch(console.error);
+            db.collection('customers').doc(cred.user.uid).set(customerData).catch(console.error);
             db.collection('customer_wallets').doc(cred.user.uid).set({
               customerId: cred.user.uid,
               balance: 0.00,
