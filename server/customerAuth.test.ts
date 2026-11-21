@@ -68,6 +68,20 @@ describe("customerAuth router", () => {
     expect(result).toMatchObject({ id: customerWithPhone.id, email: customerWithPhone.email });
     expect(mocks.createCustomerSession).toHaveBeenCalledWith(customerWithPhone, expect.anything(), true);
   });
+  it("requests password reset instructions by email or phone and returns masked confirmation", async () => {
+    const customerRecord = { ...customer, email: "mohamed@example.com", phone: "01099999999" };
+    const db = {
+      select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: async () => [customerRecord] }) }) }))
+    };
+    mocks.getDb.mockResolvedValue(db);
+    const resultByEmail = await customerAuthRouter.createCaller(context()).requestPasswordReset({ identifier: "mohamed@example.com" });
+    expect(resultByEmail.success).toBe(true);
+    expect(resultByEmail.message).toContain("mo***@example.com");
+
+    const resultByPhone = await customerAuthRouter.createCaller(context()).requestPasswordReset({ identifier: "01099999999" });
+    expect(resultByPhone.success).toBe(true);
+    expect(resultByPhone.message).toContain("mo***@example.com");
+  });
   it("verifies the current password, replaces its hash, and rotates customer sessions", async () => {
     const securedCustomer = { ...customer, passwordSalt: "0123456789abcdef", passwordHash: scryptSync("current-pass1", "0123456789abcdef", 64).toString("hex") };
     const where = vi.fn().mockResolvedValue(undefined);

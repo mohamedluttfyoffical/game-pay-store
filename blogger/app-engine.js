@@ -1875,11 +1875,12 @@ function handleTopupSubmit(e) {
   renderCurrentRoute();
 }
 
-// 9. AUTH (LOGIN & REGISTER) VIEW
+// 9. AUTH (LOGIN & REGISTER & FORGOT PASSWORD) VIEW
 function viewAuth(mode = 'login') {
   const isRegister = mode === 'register';
-  const rememberedId = (!isRegister && localStorage.getItem('gp_remember_identifier')) || '';
-  const isRemembered = !isRegister && (localStorage.getItem('gp_remember_me') !== 'false');
+  const isForgot = mode === 'forgot-password';
+  const rememberedId = (!isRegister && !isForgot && localStorage.getItem('gp_remember_identifier')) || '';
+  const isRemembered = !isRegister && !isForgot && (localStorage.getItem('gp_remember_me') !== 'false');
 
   return `
     <main dir="rtl" class="min-h-screen bg-[#07111f] p-4 text-slate-100 md:p-8">
@@ -1922,8 +1923,13 @@ function viewAuth(mode = 'login') {
             </div>
           </button>
 
-          <span class="eyebrow">${isRegister ? 'حساب جديد' : 'تسجيل الدخول'}</span>
-          <h2 class="mt-4 text-3xl font-black text-white">${isRegister ? 'أنشئ حسابك' : 'مرحبًا بعودتك'}</h2>
+          <span class="eyebrow">${isForgot ? 'استعادة الحساب' : isRegister ? 'حساب جديد' : 'تسجيل الدخول'}</span>
+          <h2 class="mt-4 text-3xl font-black text-white">${isForgot ? 'نسيت كلمة المرور؟' : isRegister ? 'أنشئ حسابك' : 'مرحبًا بعودتك'}</h2>
+          ${isForgot ? `
+            <p class="mt-3 text-sm leading-7 text-slate-400">
+              أدخل بريدك الإلكتروني أو رقم هاتفك وسنرسل لك رابط استعادة كلمة المرور.
+            </p>
+          ` : ''}
 
           <form onsubmit="handleAuthSubmit(event, '${mode}')" class="mt-8 grid gap-4">
             ${isRegister ? `
@@ -1960,19 +1966,24 @@ function viewAuth(mode = 'login') {
               </label>
             ` : ''}
 
-            <label class="field-label">كلمة المرور
-              <div class="relative">
-                <i data-lucide="lock-keyhole" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
-                <input id="authPassword" required minlength="8" type="password" placeholder="8 أحرف على الأقل" class="field-input pr-10" />
-              </div>
-            </label>
+            ${!isForgot ? `
+              <label class="field-label">كلمة المرور
+                <div class="relative">
+                  <i data-lucide="lock-keyhole" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
+                  <input id="authPassword" required minlength="8" type="password" placeholder="8 أحرف على الأقل" class="field-input pr-10" />
+                </div>
+              </label>
+            ` : ''}
 
-            ${!isRegister ? `
+            ${!isRegister && !isForgot ? `
               <div class="flex items-center justify-between mt-1">
                 <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-300">
                   <input id="authRememberMe" type="checkbox" ${isRemembered ? 'checked' : ''} class="h-4 w-4 rounded border-white/20 bg-white/5 text-cyan-400 focus:ring-cyan-400 cursor-pointer" />
                   <span>تذكرني</span>
                 </label>
+                <button type="button" onclick="navigate('forgot-password')" class="text-xs text-cyan-300 hover:underline">
+                  نسيت كلمة المرور؟
+                </button>
               </div>
             ` : ''}
 
@@ -1998,17 +2009,29 @@ function viewAuth(mode = 'login') {
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                 </svg>
-                <span>${isRegister ? 'جارٍ إنشاء الحساب...' : 'جارٍ تسجيل الدخول...'}</span>
+                <span>${isForgot ? 'جارٍ إرسال الرابط...' : isRegister ? 'جارٍ إنشاء الحساب...' : 'جارٍ تسجيل الدخول...'}</span>
               </span>
-              <span id="authBtnText">${isRegister ? 'إنشاء الحساب' : 'تسجيل الدخول'}</span>
+              <span id="authBtnText">${isForgot ? 'إرسال رابط الاستعادة' : isRegister ? 'إنشاء الحساب' : 'تسجيل الدخول'}</span>
             </button>
           </form>
 
           <p class="mt-6 text-center text-sm text-slate-400">
-            ${isRegister ? 'لديك حساب بالفعل؟' : 'ليس لديك حساب؟'}
-            <button onclick="navigate('${isRegister ? 'login' : 'register'}')" class="font-bold text-cyan-300">
-              ${isRegister ? 'سجّل الدخول' : 'أنشئ حسابًا'}
-            </button>
+            ${isForgot ? `
+              تذكرت كلمة المرور؟
+              <button onclick="navigate('login')" class="font-bold text-cyan-300">
+                سجّل الدخول
+              </button>
+            ` : isRegister ? `
+              لديك حساب بالفعل؟
+              <button onclick="navigate('login')" class="font-bold text-cyan-300">
+                سجّل الدخول
+              </button>
+            ` : `
+              ليس لديك حساب؟
+              <button onclick="navigate('register')" class="font-bold text-cyan-300">
+                أنشئ حسابًا
+              </button>
+            `}
           </p>
         </section>
       </div>
@@ -2059,6 +2082,79 @@ function handleAuthSubmit(e, mode) {
   const confirmPassword = document.getElementById('authConfirmPassword')?.value;
   const termsChecked = document.getElementById('authTerms')?.checked;
   const rememberMe = document.getElementById('authRememberMe')?.checked ?? true;
+
+  if (mode === 'forgot-password') {
+    if (!rawIdentifier) {
+      showToast('يرجى إدخال البريد الإلكتروني أو رقم الهاتف.', 'error');
+      return;
+    }
+    const btn = document.getElementById('authSubmitBtn');
+    const spinner = document.getElementById('authBtnSpinner');
+    const btnText = document.getElementById('authBtnText');
+    function setLoading(isLoading) {
+      if (!btn) return;
+      btn.disabled = isLoading;
+      if (isLoading) {
+        spinner?.classList.remove('hidden');
+        btnText?.classList.add('invisible');
+      } else {
+        spinner?.classList.add('hidden');
+        btnText?.classList.remove('invisible');
+      }
+    }
+    setLoading(true);
+
+    const isEmail = rawIdentifier.includes('@');
+    const sendReset = (targetEmail) => {
+      auth.sendPasswordResetEmail(targetEmail)
+        .then(() => {
+          setLoading(false);
+          const masked = targetEmail.replace(/(.{2})(.*)(?=@)/, '$1***');
+          showToast(`تم إرسال رابط استعادة كلمة المرور إلى البريد: ${masked}`, 'success');
+        })
+        .catch(err => {
+          setLoading(false);
+          let msg = 'تعذر إرسال رابط استعادة كلمة المرور.';
+          if (err.code === 'auth/user-not-found') msg = 'لا يوجد حساب مسجل بهذا البريد الإلكتروني.';
+          else if (err.code === 'auth/invalid-email') msg = 'صيغة البريد الإلكتروني غير صحيحة.';
+          showToast(msg, 'error');
+        });
+    };
+
+    if (isFirebaseActive && auth) {
+      if (isEmail) {
+        sendReset(rawIdentifier.toLowerCase());
+      } else {
+        if (db) {
+          const keys = getPhoneLookupKeys(rawIdentifier);
+          Promise.all(keys.map(k => db.collection('phone_lookup').doc(k).get().catch(() => null)))
+            .then(snapshots => {
+              const matchedSnap = snapshots.find(snap => snap && snap.exists && snap.data() && snap.data().email);
+              if (matchedSnap) {
+                sendReset(matchedSnap.data().email);
+              } else {
+                setLoading(false);
+                showToast('لا يوجد حساب مسجل برقم الهاتف هذا.', 'error');
+              }
+            })
+            .catch(err => {
+              console.error('Phone lookup reset error:', err);
+              setLoading(false);
+              showToast('حدث خطأ أثناء فحص رقم الهاتف.', 'error');
+            });
+        } else {
+          setLoading(false);
+          showToast('لا يوجد حساب مسجل برقم الهاتف هذا.', 'error');
+        }
+      }
+    } else {
+      setTimeout(() => {
+        setLoading(false);
+        showToast('تم إرسال رابط استعادة كلمة المرور بنجاح!', 'success');
+      }, 500);
+    }
+    return;
+  }
 
   if (!rawIdentifier || !password) return;
 
@@ -2838,6 +2934,8 @@ function renderCurrentRoute() {
     content = viewAuth('login');
   } else if (route.path === 'register') {
     content = viewAuth('register');
+  } else if (route.path === 'forgot-password') {
+    content = viewAuth('forgot-password');
   } else if (route.path === 'admin') {
     if (adminAuthenticated) {
       loadAdminData();
@@ -2848,7 +2946,7 @@ function renderCurrentRoute() {
   }
 
   // Header & Footer Wrap (unless auth page or admin)
-  if (route.path === 'login' || route.path === 'register' || route.path === 'admin') {
+  if (route.path === 'login' || route.path === 'register' || route.path === 'forgot-password' || route.path === 'admin') {
     app.innerHTML = content;
   } else {
     app.innerHTML = `

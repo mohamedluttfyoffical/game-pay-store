@@ -40,6 +40,7 @@ function Router() {
       <Route path={"/notifications"} component={Notifications} />
       <Route path={"/login"}>{() => <AuthPage mode="login" />}</Route>
       <Route path={"/register"}>{() => <AuthPage mode="register" />}</Route>
+      <Route path={"/forgot-password"}>{() => <AuthPage mode="forgot-password" />}</Route>
       <Route path={"/order-success/:reference"} component={OrderSuccess} />
       <Route path={"/admin/login"} component={AdminLogin} />
       <Route path={"/admin/navigation"} component={AdminNavigation} />

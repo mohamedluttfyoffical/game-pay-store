@@ -6,11 +6,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
-export function AuthPage({ mode }: { mode: "login" | "register" }) {
+export function AuthPage({ mode }: { mode: "login" | "register" | "forgot-password" }) {
   const [, setLocation] = useLocation();
   const { user, loading } = useAuth();
   const utils = trpc.useUtils();
   const creating = mode === "register";
+  const forgot = mode === "forgot-password";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [identifier, setIdentifier] = useState("");
@@ -55,6 +56,13 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     onError: error => toast.error(error.message)
   });
 
+  const resetMutation = trpc.customerAuth.requestPasswordReset.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message || "تم إرسال رابط استعادة كلمة المرور بنجاح");
+    },
+    onError: (error) => toast.error(error.message)
+  });
+
   useEffect(() => {
     if (!loading && user) setLocation("/account");
   }, [loading, user, setLocation]);
@@ -65,6 +73,10 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       if (password !== confirmPassword) return toast.error("كلمة المرور وتأكيدها غير متطابقين.");
       if (!termsAccepted) return toast.error("يرجى الموافقة على شروط وسياسة المنصة للمتابعة.");
       register.mutate({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
+    } else if (forgot) {
+      const loginId = identifier.trim() || email.trim();
+      if (!loginId) return toast.error("يرجى إدخال البريد الإلكتروني أو رقم الهاتف.");
+      resetMutation.mutate({ identifier: loginId });
     } else {
       const loginId = identifier.trim() || email.trim();
       if (!loginId) return toast.error("يرجى إدخال البريد الإلكتروني أو رقم الهاتف.");
@@ -72,7 +84,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
     }
   };
 
-  const pending = register.isPending || login.isPending;
+  const pending = register.isPending || login.isPending || resetMutation.isPending;
 
   return (
     <main dir="rtl" className="min-h-screen bg-[#07111f] p-4 text-slate-100 md:p-8">
@@ -99,8 +111,15 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
           <button onClick={() => setLocation("/")} className="mb-10 self-start lg:hidden">
             <GameMark />
           </button>
-          <span className="eyebrow">{creating ? "حساب جديد" : "تسجيل الدخول"}</span>
-          <h2 className="mt-4 text-3xl font-black text-white">{creating ? "أنشئ حسابك" : "مرحبًا بعودتك"}</h2>
+          <span className="eyebrow">{forgot ? "استعادة الحساب" : creating ? "حساب جديد" : "تسجيل الدخول"}</span>
+          <h2 className="mt-4 text-3xl font-black text-white">
+            {forgot ? "نسيت كلمة المرور؟" : creating ? "أنشئ حسابك" : "مرحبًا بعودتك"}
+          </h2>
+          {forgot && (
+            <p className="mt-3 text-sm leading-7 text-slate-400">
+              أدخل بريدك الإلكتروني أو رقم هاتفك وسنرسل لك رابط استعادة كلمة المرور.
+            </p>
+          )}
 
           <form onSubmit={submit} className="mt-8 grid gap-4">
             {creating && (
@@ -174,31 +193,33 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
               </label>
             )}
 
-            <label className="field-label">
-              كلمة المرور
-              <div className="relative">
-                <LockKeyhole className="absolute right-3 top-3.5 h-4 w-4 text-slate-500" />
-                <input
-                  required
-                  minLength={8}
-                  type={showPassword ? "text" : "password"}
-                  autoComplete={creating ? "new-password" : "current-password"}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="8 أحرف على الأقل مع رقم"
-                  className="field-input px-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute left-3 top-3 text-slate-500 hover:text-slate-300"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </label>
+            {!forgot && (
+              <label className="field-label">
+                كلمة المرور
+                <div className="relative">
+                  <LockKeyhole className="absolute right-3 top-3.5 h-4 w-4 text-slate-500" />
+                  <input
+                    required
+                    minLength={8}
+                    type={showPassword ? "text" : "password"}
+                    autoComplete={creating ? "new-password" : "current-password"}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="8 أحرف على الأقل مع رقم"
+                    className="field-input px-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute left-3 top-3 text-slate-500 hover:text-slate-300"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </label>
+            )}
 
-            {!creating && (
+            {!creating && !forgot && (
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 select-none">
                   <input
@@ -209,6 +230,13 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
                   />
                   <span>تذكرني</span>
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setLocation("/forgot-password")}
+                  className="text-xs text-cyan-300 hover:underline"
+                >
+                  نسيت كلمة المرور؟
+                </button>
               </div>
             )}
 
@@ -259,21 +287,35 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
               )}
               <span>
                 {pending
-                  ? (creating ? "جارٍ إنشاء الحساب..." : "جارٍ تسجيل الدخول...")
-                  : (creating ? "إنشاء الحساب" : "تسجيل الدخول")}
+                  ? (forgot ? "جارٍ إرسال الرابط..." : creating ? "جارٍ إنشاء الحساب..." : "جارٍ تسجيل الدخول...")
+                  : (forgot ? "إرسال رابط الاستعادة" : creating ? "إنشاء الحساب" : "تسجيل الدخول")}
               </span>
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
-            {creating ? "لديك حساب بالفعل؟" : "ليس لديك حساب؟"}{" "}
-            <button
-              onClick={() => setLocation(creating ? "/login" : "/register")}
-              className="font-bold text-cyan-300"
-            >
-              {creating ? "سجّل الدخول" : "أنشئ حسابًا"}
-            </button>
-          </p>
+          <div className="mt-6 text-center text-sm text-slate-400 space-y-2">
+            {forgot ? (
+              <p>
+                تذكرت كلمة المرور؟{" "}
+                <button
+                  onClick={() => setLocation("/login")}
+                  className="font-bold text-cyan-300"
+                >
+                  سجّل الدخول
+                </button>
+              </p>
+            ) : (
+              <p>
+                {creating ? "لديك حساب بالفعل؟" : "ليس لديك حساب؟"}{" "}
+                <button
+                  onClick={() => setLocation(creating ? "/login" : "/register")}
+                  className="font-bold text-cyan-300"
+                >
+                  {creating ? "سجّل الدخول" : "أنشئ حسابًا"}
+                </button>
+              </p>
+            )}
+          </div>
         </section>
       </div>
     </main>

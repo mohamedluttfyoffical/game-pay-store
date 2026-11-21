@@ -23,10 +23,14 @@ describe("customer login session handoff", () => {
     expect(authPage).not.toContain("أدخل بيانات حسابك الخاصة بـ Game Pay للمتابعة.");
     expect(authPage).toContain("البريد الإلكتروني أو رقم الهاتف");
     expect(authPage).toContain("تذكرني");
+    expect(authPage).toContain("نسيت كلمة المرور؟");
+    expect(authPage).toContain("استعادة الحساب");
 
     // Blogger template
     expect(bloggerTemplate).not.toContain("أدخل بيانات حسابك الخاصة بـ Game Pay للمتابعة.");
     expect(bloggerTemplate).toContain("البريد الإلكتروني أو رقم الهاتف");
     expect(bloggerTemplate).toContain("تذكرني");
+    expect(bloggerTemplate).toContain("نسيت كلمة المرور؟");
+    expect(bloggerTemplate).toContain("استعادة الحساب");
   });
 });
