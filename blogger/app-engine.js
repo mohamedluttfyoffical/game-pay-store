@@ -207,12 +207,28 @@ try {
   }
 } catch(e) {}
 
+// Clean any legacy default/corrupted cart items so cart starts completely empty
+let initialCart = [];
+try {
+  const cleanedKey = 'gp_cart_cleaned_v3';
+  if (!localStorage.getItem(cleanedKey)) {
+    localStorage.removeItem('gp_cart');
+    localStorage.setItem(cleanedKey, 'true');
+    initialCart = [];
+  } else {
+    const savedCart = JSON.parse(localStorage.getItem('gp_cart') || '[]');
+    initialCart = Array.isArray(savedCart) ? savedCart : [];
+  }
+} catch (e) {
+  initialCart = [];
+}
+
 // --- App State Store ---
 const Store = {
   products: JSON.parse(localStorage.getItem('gp_products') || 'null') || INITIAL_PRODUCTS,
   games: INITIAL_GAMES,
   homepage: savedHomepage || INITIAL_HOMEPAGE_CONFIG,
-  cart: JSON.parse(localStorage.getItem('gp_cart') || '[]'),
+  cart: initialCart,
   user: JSON.parse(localStorage.getItem('gp_user') || 'null'),
   orders: JSON.parse(localStorage.getItem('gp_orders') || '[]'),
   wallet: initialWallet,
@@ -312,11 +328,15 @@ function showToast(msg, type = 'info') {
 
 // --- Cart Operations ---
 function addToCart(productId, qty = 1) {
-  const product = Store.products.find(p => p.id === Number(productId));
+  const pIdStr = String(productId);
+  const product = Store.products.find(p => String(p.id) === pIdStr || (p.slug && String(p.slug) === pIdStr));
   if (!product) return;
-  const existing = Store.cart.find(c => c.productId === product.id);
+  const existing = Store.cart.find(c => {
+    const cId = String(c.productId ?? c.product?.id ?? c.id ?? '');
+    return cId === String(product.id) || (product.slug && cId === String(product.slug));
+  });
   if (existing) {
-    existing.quantity += qty;
+    existing.quantity = (existing.quantity || 1) + qty;
   } else {
     Store.cart.push({
       productId: product.id,
@@ -328,12 +348,16 @@ function addToCart(productId, qty = 1) {
   showToast('أُضيف المنتج إلى سلتك', 'success');
 }
 
-function updateCartQty(productId, qty) {
+function updateCartQty(identifier, qty) {
   if (qty <= 0) {
-    removeFromCart(productId);
+    removeFromCart(identifier);
     return;
   }
-  const item = Store.cart.find(c => c.productId === Number(productId));
+  const targetId = String(identifier);
+  const item = Store.cart.find((c, idx) => {
+    const cId = String(c.productId ?? c.product?.id ?? c.id ?? '');
+    return cId === targetId || String(idx) === targetId;
+  });
   if (item) {
     item.quantity = qty;
     Store.saveCart();
@@ -341,19 +365,37 @@ function updateCartQty(productId, qty) {
   }
 }
 
-function removeFromCart(productId) {
-  Store.cart = Store.cart.filter(c => c.productId !== Number(productId));
+function removeFromCart(identifier) {
+  const targetId = String(identifier);
+  Store.cart = Store.cart.filter((c, idx) => {
+    const cId = String(c.productId ?? c.product?.id ?? c.id ?? '');
+    const cSlug = String(c.product?.slug ?? '');
+    if (cId === targetId || cSlug === targetId || String(idx) === targetId) {
+      return false;
+    }
+    return true;
+  });
   Store.saveCart();
   renderCurrentRoute();
   showToast('تمت إزالة المنتج من السلة');
 }
 
+function clearCart() {
+  Store.cart = [];
+  Store.saveCart();
+  renderCurrentRoute();
+  showToast('تم إفراغ السلة بالكامل');
+}
+
 function getCartCount() {
-  return Store.cart.reduce((sum, item) => sum + item.quantity, 0);
+  return Store.cart.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
 }
 
 function getCartSubtotal() {
-  return Store.cart.reduce((sum, item) => sum + (Number(item.product.price) * item.quantity), 0);
+  return Store.cart.reduce((sum, item) => {
+    const price = Number(item.product?.price ?? item.price ?? 0);
+    return sum + (price * (Number(item.quantity) || 1));
+  }, 0);
 }
 
 // --- Dynamic Visual Component Generator ---
@@ -1074,35 +1116,47 @@ function viewCart() {
 
   return `
     <section class="container py-6 sm:py-12">
-      <span class="eyebrow">سلة التسوق</span>
-      <h1 class="mt-4 text-3xl font-black text-white">جاهز لإتمام طلبك؟</h1>
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <span class="eyebrow">سلة التسوق</span>
+          <h1 class="mt-2 text-3xl font-black text-white">جاهز لإتمام طلبك؟</h1>
+        </div>
+        <button onclick="clearCart()" class="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-rose-400 transition">
+          <i data-lucide="trash-2" class="h-4 w-4"></i>
+          <span>إفراغ السلة</span>
+        </button>
+      </div>
 
       <div class="mt-6 grid gap-5 sm:mt-8 sm:gap-7 lg:grid-cols-[1fr_330px]">
         <div class="overflow-hidden rounded-2xl border border-white/[.08] bg-[#0d1929]">
-          ${lines.map(line => `
+          ${lines.map((line, idx) => {
+            const p = line.product || Store.products.find(prod => String(prod.id) === String(line.productId)) || { id: line.productId || idx, name: 'منتج رقمي', price: 0 };
+            const pId = p.id ?? line.productId ?? idx;
+            const pPrice = Number(p.price || 0);
+            return `
             <div class="flex flex-col gap-4 border-b border-white/[.07] p-4 sm:flex-row sm:items-center">
               <div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-cyan-300/10 text-xs font-black text-cyan-200">GP</div>
               <div class="min-w-0 flex-1">
-                <h2 class="font-bold text-white">${line.product.name}</h2>
-                <p class="mt-1 text-xs text-slate-500">${line.product.deliveryEta || 'تسليم رقمي'} · تسليم رقمي</p>
+                <h2 class="font-bold text-white">${p.name || 'منتج'}</h2>
+                <p class="mt-1 text-xs text-slate-500">${p.deliveryEta || 'تسليم رقمي'} · تسليم رقمي</p>
               </div>
               <div class="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
                 <div class="flex items-center rounded-xl border border-white/10">
-                  <button onclick="updateCartQty(${line.product.id}, ${line.quantity - 1})" class="grid h-10 w-10 place-items-center text-slate-400 hover:text-white">
+                  <button onclick="updateCartQty('${pId}', ${(line.quantity || 1) - 1})" class="grid h-10 w-10 place-items-center text-slate-400 hover:text-white">
                     <i data-lucide="minus" class="h-4 w-4"></i>
                   </button>
-                  <span class="w-7 text-center text-sm font-bold">${line.quantity}</span>
-                  <button onclick="updateCartQty(${line.product.id}, ${line.quantity + 1})" class="grid h-10 w-10 place-items-center text-slate-400 hover:text-white">
+                  <span class="w-7 text-center text-sm font-bold">${line.quantity || 1}</span>
+                  <button onclick="updateCartQty('${pId}', ${(line.quantity || 1) + 1})" class="grid h-10 w-10 place-items-center text-slate-400 hover:text-white">
                     <i data-lucide="plus" class="h-4 w-4"></i>
                   </button>
                 </div>
-                <strong class="text-sm text-cyan-200">${formatPrice(Number(line.product.price) * line.quantity)}</strong>
-                <button onclick="removeFromCart(${line.product.id})" class="icon-button h-10 w-10 text-rose-300" aria-label="حذف">
+                <strong class="text-sm text-cyan-200">${formatPrice(pPrice * (line.quantity || 1))}</strong>
+                <button onclick="removeFromCart('${pId}')" class="icon-button h-10 w-10 text-rose-300 hover:bg-rose-500/10" aria-label="حذف">
                   <i data-lucide="trash-2" class="h-4 w-4"></i>
                 </button>
               </div>
             </div>
-          `).join('')}
+          `;}).join('')}
         </div>
 
         <!-- Cart Summary Sidebar -->
