@@ -2469,7 +2469,10 @@ async function syncProductsToFirebase() {
     await batch.commit();
     showToast('تمت مزامنة جميع المنتجات مع Firestore بنجاح!', 'success');
   } catch (e) {
-    showToast('خطأ في المزامنة: ' + e.message, 'error');
+    console.warn('Sync products error:', e.message);
+    if (adminAuthenticated) {
+      showToast('خطأ في المزامنة: ' + e.message, 'error');
+    }
   }
 }
 
@@ -2582,8 +2585,6 @@ async function loadFirebaseData() {
         localStorage.setItem('gp_products', JSON.stringify(Store.products));
         renderCurrentRoute();
       }
-    } else {
-      syncProductsToFirebase();
     }
 
     // 2. Sync homepage config if exists
