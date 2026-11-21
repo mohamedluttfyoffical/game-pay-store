@@ -1868,9 +1868,11 @@ function viewAuth(mode = 'login') {
 
           <span class="eyebrow">${isRegister ? 'حساب جديد' : 'تسجيل الدخول'}</span>
           <h2 class="mt-4 text-3xl font-black text-white">${isRegister ? 'أنشئ حسابك' : 'مرحبًا بعودتك'}</h2>
-          <p class="mt-3 text-sm leading-7 text-slate-400">
-            ${isRegister ? 'أكمل بياناتك لبدء تتبع طلباتك ومحفظتك من حساب مستقل.' : 'أدخل بيانات حسابك الخاصة بـ Game Pay للمتابعة.'}
-          </p>
+          ${!isRegister ? `
+            <p class="mt-3 text-sm leading-7 text-slate-400">
+              أدخل بيانات حسابك الخاصة بـ Game Pay للمتابعة.
+            </p>
+          ` : ''}
 
           <form onsubmit="handleAuthSubmit(event, '${mode}')" class="mt-8 grid gap-4">
             ${isRegister ? `
@@ -1881,20 +1883,55 @@ function viewAuth(mode = 'login') {
                 </div>
               </label>
             ` : ''}
+
             <label class="field-label">البريد الإلكتروني
               <div class="relative">
                 <i data-lucide="mail" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
                 <input id="authEmail" required type="email" placeholder="name@example.com" class="field-input pr-10" />
               </div>
             </label>
+
+            ${isRegister ? `
+              <label class="field-label">رقم الهاتف
+                <div class="relative">
+                  <i data-lucide="phone" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
+                  <input id="authPhone" required type="tel" placeholder="01xxxxxxxxx" class="field-input pr-10" />
+                </div>
+              </label>
+            ` : ''}
+
             <label class="field-label">كلمة المرور
               <div class="relative">
                 <i data-lucide="lock-keyhole" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
                 <input id="authPassword" required minlength="8" type="password" placeholder="8 أحرف على الأقل" class="field-input pr-10" />
               </div>
             </label>
-            <button type="submit" class="btn-primary mt-2 w-full py-3.5">
-              ${isRegister ? 'إنشاء الحساب' : 'تسجيل الدخول'}
+
+            ${isRegister ? `
+              <label class="field-label">تأكيد كلمة المرور
+                <div class="relative">
+                  <i data-lucide="lock-keyhole" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
+                  <input id="authConfirmPassword" required minlength="8" type="password" placeholder="أعد إدخال كلمة المرور" class="field-input pr-10" />
+                </div>
+              </label>
+
+              <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-300 select-none mt-1">
+                <input id="authTerms" type="checkbox" required class="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/5 text-cyan-400 focus:ring-cyan-400 cursor-pointer" />
+                <span>
+                  أوافق على <a href="#home" class="text-cyan-300 underline underline-offset-2">شروط الاستخدام</a> و <a href="#home" class="text-cyan-300 underline underline-offset-2">سياسة الخصوصية</a> الخاصة بـ Game Pay.
+                </span>
+              </label>
+            ` : ''}
+
+            <button id="authSubmitBtn" type="submit" class="btn-primary mt-2 w-full py-3.5 relative flex items-center justify-center transition-all duration-200">
+              <span id="authBtnSpinner" class="hidden absolute inset-0 flex items-center justify-center bg-cyan-400 text-slate-950 font-bold rounded-xl gap-2">
+                <svg class="animate-spin h-5 w-5 text-slate-950" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                <span>${isRegister ? 'جارٍ إنشاء الحساب...' : 'جارٍ تسجيل الدخول...'}</span>
+              </span>
+              <span id="authBtnText">${isRegister ? 'إنشاء الحساب' : 'تسجيل الدخول'}</span>
             </button>
           </form>
 
@@ -1915,28 +1952,67 @@ function handleAuthSubmit(e, mode) {
   const email = document.getElementById('authEmail')?.value.trim();
   const password = document.getElementById('authPassword')?.value;
   const name = document.getElementById('authName')?.value.trim() || email.split('@')[0];
+  const phone = document.getElementById('authPhone')?.value.trim() || '';
+  const confirmPassword = document.getElementById('authConfirmPassword')?.value;
+  const termsChecked = document.getElementById('authTerms')?.checked;
 
   if (!email || !password) return;
+
+  if (mode === 'register') {
+    if (password !== confirmPassword) {
+      showToast('كلمة المرور وتأكيدها غير متطابقين.', 'error');
+      return;
+    }
+    if (!termsChecked) {
+      showToast('يرجى الموافقة على شروط وسياسة المنصة للمتابعة.', 'error');
+      return;
+    }
+  }
+
+  const btn = document.getElementById('authSubmitBtn');
+  const spinner = document.getElementById('authBtnSpinner');
+  const btnText = document.getElementById('authBtnText');
+  function setLoading(isLoading) {
+    if (!btn) return;
+    btn.disabled = isLoading;
+    if (isLoading) {
+      spinner?.classList.remove('hidden');
+      btnText?.classList.add('invisible');
+    } else {
+      spinner?.classList.add('hidden');
+      btnText?.classList.remove('invisible');
+    }
+  }
+
+  setLoading(true);
 
   if (isFirebaseActive && auth) {
     if (mode === 'register') {
       auth.createUserWithEmailAndPassword(email, password)
         .then(cred => {
           cred.user.updateProfile({ displayName: name }).catch(console.error);
-          const userObj = { uid: cred.user.uid, name, email };
+          const userObj = { uid: cred.user.uid, name, email, phone };
           Store.user = userObj;
           Store.saveUser();
 
-          // Write customer profile and initial 0.00 wallet in Firestore
+          // Save user fields to collection 'users' in Firestore
           if (db) {
-            db.collection('customers').doc(cred.user.uid).set({
+            const userData = {
               id: cred.user.uid,
+              uid: cred.user.uid,
               name,
               email,
-              phone: '',
+              phone,
+              role: 'customer',
+              termsAccepted: true,
               createdAt: new Date().toISOString()
-            }).catch(console.error);
+            };
 
+            // 1. Save to 'users' collection as requested
+            db.collection('users').doc(cred.user.uid).set(userData).catch(console.error);
+
+            // 2. Also keep 'customers' & 'customer_wallets' synced
+            db.collection('customers').doc(cred.user.uid).set(userData).catch(console.error);
             db.collection('customer_wallets').doc(cred.user.uid).set({
               customerId: cred.user.uid,
               balance: 0.00,
@@ -1945,10 +2021,12 @@ function handleAuthSubmit(e, mode) {
           }
 
           attachUserListeners(cred.user.uid);
+          setLoading(false);
           showToast('تم إنشاء حسابك بنجاح في متجر Game Pay!', 'success');
           navigate('account');
         })
         .catch(err => {
+          setLoading(false);
           let msg = err.message;
           if (err.code === 'auth/email-already-in-use') msg = 'البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول.';
           else if (err.code === 'auth/weak-password') msg = 'كلمة المرور ضعيفة. يرجى كتابة 8 أحرف على الأقل.';
@@ -1962,10 +2040,12 @@ function handleAuthSubmit(e, mode) {
           Store.user = userObj;
           Store.saveUser();
           attachUserListeners(cred.user.uid);
+          setLoading(false);
           showToast('أهلًا بك من جديد!', 'success');
           navigate('account');
         })
         .catch(err => {
+          setLoading(false);
           let msg = err.message;
           if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
             msg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
@@ -1977,10 +2057,13 @@ function handleAuthSubmit(e, mode) {
     }
   } else {
     // Standalone fallback
-    Store.user = { uid: 'user-' + Date.now(), name, email };
-    Store.saveUser();
-    showToast(mode === 'register' ? 'تم إنشاء الحساب بنجاح!' : 'أهلًا بعودتك!', 'success');
-    navigate('account');
+    setTimeout(() => {
+      Store.user = { uid: 'user-' + Date.now(), name, email, phone };
+      Store.saveUser();
+      setLoading(false);
+      showToast(mode === 'register' ? 'تم إنشاء الحساب بنجاح!' : 'أهلًا بعودتك!', 'success');
+      navigate('account');
+    }, 500);
   }
 }
 

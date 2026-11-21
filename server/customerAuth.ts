@@ -31,13 +31,13 @@ const passwordSchema = z.string().min(8, "كلمة المرور يجب أن تت
 
 export const customerAuthRouter = router({
   me: publicProcedure.query(({ ctx }) => isCustomer(ctx.user) ? publicCustomer(ctx.user) : null),
-  register: publicProcedure.input(z.object({ name: z.string().trim().min(2).max(160), email: z.string().trim().toLowerCase().email().max(320), password: passwordSchema })).mutation(async ({ ctx, input }) => {
+  register: publicProcedure.input(z.object({ name: z.string().trim().min(2).max(160), email: z.string().trim().toLowerCase().email().max(320), phone: z.string().trim().max(48).optional(), password: passwordSchema })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "قاعدة البيانات غير متاحة." });
     const [existing] = await db.select({ id: customers.id }).from(customers).where(eq(customers.email, input.email)).limit(1);
     if (existing) throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجّل بالفعل بهذا البريد الإلكتروني." });
     const password = await hashPassword(input.password);
-    const [record] = await db.insert(customers).values({ name: input.name, email: input.email, ...password }).$returningId();
+    const [record] = await db.insert(customers).values({ name: input.name, email: input.email, phone: input.phone || null, ...password }).$returningId();
     const [customer] = await db.select().from(customers).where(eq(customers.id, record.id)).limit(1);
     if (!customer) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء الحساب." });
     await createCustomerSession(customer, ctx.res);
