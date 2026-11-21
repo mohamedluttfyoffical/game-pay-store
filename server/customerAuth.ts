@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { z } from "zod";
@@ -9,6 +9,40 @@ import { createCustomerSession, CUSTOMER_SESSION_COOKIE, hashCustomerSessionToke
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 
 const scrypt = promisify(scryptCallback);
+
+export function normalizePhone(raw: string) {
+  if (!raw) return "";
+  const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+  let str = String(raw).trim().replace(/[٠-٩]/g, d => String(arabicDigits.indexOf(d)));
+  str = str.replace(/[\s\-\(\)]/g, "");
+  return str;
+}
+
+export function getPhoneLookupKeys(raw: string) {
+  const clean = normalizePhone(raw);
+  if (!clean) return [];
+  const keys = new Set<string>();
+  keys.add(clean);
+  let digits = clean.replace(/^\+/, "");
+  keys.add(digits);
+  if (digits.startsWith("0020")) {
+    const d = digits.slice(4);
+    keys.add("0" + d);
+    keys.add(d);
+    keys.add("20" + d);
+    keys.add("+20" + d);
+  } else if (digits.startsWith("20") && digits.length === 12) {
+    const local = "0" + digits.slice(2);
+    keys.add(local);
+    keys.add(digits.slice(2));
+    keys.add("+" + digits);
+  } else if (digits.startsWith("01") && digits.length === 11) {
+    keys.add("20" + digits.slice(1));
+    keys.add("+20" + digits.slice(1));
+    keys.add(digits.slice(1));
+  }
+  return Array.from(keys);
+}
 
 function publicCustomer(customer: Customer) {
   const { passwordHash: _hash, passwordSalt: _salt, ...safe } = customer;
@@ -37,7 +71,8 @@ export const customerAuthRouter = router({
     const [existing] = await db.select({ id: customers.id }).from(customers).where(eq(customers.email, input.email)).limit(1);
     if (existing) throw new TRPCError({ code: "CONFLICT", message: "يوجد حساب مسجّل بالفعل بهذا البريد الإلكتروني." });
     const password = await hashPassword(input.password);
-    const [record] = await db.insert(customers).values({ name: input.name, email: input.email, phone: input.phone || null, ...password }).$returningId();
+    const normalizedPhone = input.phone ? (normalizePhone(input.phone) || input.phone) : null;
+    const [record] = await db.insert(customers).values({ name: input.name, email: input.email, phone: normalizedPhone, ...password }).$returningId();
     const [customer] = await db.select().from(customers).where(eq(customers.id, record.id)).limit(1);
     if (!customer) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "تعذر إنشاء الحساب." });
     await createCustomerSession(customer, ctx.res);
@@ -54,9 +89,15 @@ export const customerAuthRouter = router({
     const rawIdentifier = (input.identifier || input.email || "").trim();
     if (!rawIdentifier) throw new TRPCError({ code: "BAD_REQUEST", message: "يرجى إدخال البريد الإلكتروني أو رقم الهاتف." });
     const isEmail = rawIdentifier.includes("@");
-    const [customer] = isEmail
-      ? await db.select().from(customers).where(eq(customers.email, rawIdentifier.toLowerCase())).limit(1)
-      : await db.select().from(customers).where(eq(customers.phone, rawIdentifier)).limit(1);
+    let customer: Customer | undefined;
+    if (isEmail) {
+      const [res] = await db.select().from(customers).where(eq(customers.email, rawIdentifier.toLowerCase())).limit(1);
+      customer = res;
+    } else {
+      const keys = getPhoneLookupKeys(rawIdentifier);
+      const [res] = await db.select().from(customers).where(inArray(customers.phone, keys)).limit(1);
+      customer = res;
+    }
     if (!customer || !(await verifyPassword(input.password, customer))) throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحين." });
     await db.update(customers).set({ lastSignedIn: new Date() }).where(eq(customers.id, customer.id));
     if (input.rememberMe !== undefined) {

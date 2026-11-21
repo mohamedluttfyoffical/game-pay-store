@@ -1962,6 +1962,40 @@ function viewAuth(mode = 'login') {
   `;
 }
 
+function normalizePhone(raw) {
+  if (!raw) return '';
+  const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
+  let str = String(raw).trim().replace(/[٠-٩]/g, d => arabicDigits.indexOf(d));
+  str = str.replace(/[\s\-\(\)]/g, '');
+  return str;
+}
+
+function getPhoneLookupKeys(raw) {
+  const clean = normalizePhone(raw);
+  if (!clean) return [];
+  const keys = new Set();
+  keys.add(clean);
+  let digits = clean.replace(/^\+/, '');
+  keys.add(digits);
+  if (digits.startsWith('0020')) {
+    const d = digits.slice(4);
+    keys.add('0' + d);
+    keys.add(d);
+    keys.add('20' + d);
+    keys.add('+20' + d);
+  } else if (digits.startsWith('20') && digits.length === 12) {
+    const local = '0' + digits.slice(2);
+    keys.add(local);
+    keys.add(digits.slice(2));
+    keys.add('+' + digits);
+  } else if (digits.startsWith('01') && digits.length === 11) {
+    keys.add('20' + digits.slice(1));
+    keys.add('+20' + digits.slice(1));
+    keys.add(digits.slice(1));
+  }
+  return Array.from(keys);
+}
+
 function handleAuthSubmit(e, mode) {
   e.preventDefault();
   const rawIdentifier = (document.getElementById('authEmail')?.value || '').trim();
@@ -2018,7 +2052,7 @@ function handleAuthSubmit(e, mode) {
               uid: cred.user.uid,
               name,
               email: rawIdentifier,
-              phone,
+              phone: normalizePhone(phone) || phone,
               role: 'customer',
               termsAccepted: true,
               createdAt: new Date().toISOString()
@@ -2031,13 +2065,17 @@ function handleAuthSubmit(e, mode) {
               updatedAt: new Date().toISOString()
             }).catch(console.error);
 
-            // Save phone lookup for phone-based login
+            // Save phone lookup for phone-based login across all formats
             if (phone) {
-              db.collection('phone_lookup').doc(phone).set({
-                email: rawIdentifier.toLowerCase(),
-                uid: cred.user.uid,
-                createdAt: new Date().toISOString()
-              }).catch(console.error);
+              const keys = getPhoneLookupKeys(phone);
+              keys.forEach(k => {
+                db.collection('phone_lookup').doc(k).set({
+                  email: rawIdentifier.toLowerCase(),
+                  uid: cred.user.uid,
+                  phone: normalizePhone(phone) || phone,
+                  createdAt: new Date().toISOString()
+                }).catch(console.error);
+              });
             }
           }
 
@@ -2082,6 +2120,24 @@ function handleAuthSubmit(e, mode) {
             Store.user = userObj;
             Store.saveUser();
             attachUserListeners(cred.user.uid);
+
+            // Auto-backfill phone_lookup if user has a phone number saved in profile
+            if (db) {
+              db.collection('customers').doc(cred.user.uid).get().then(cSnap => {
+                if (cSnap.exists && cSnap.data() && cSnap.data().phone) {
+                  const pKeys = getPhoneLookupKeys(cSnap.data().phone);
+                  pKeys.forEach(pk => {
+                    db.collection('phone_lookup').doc(pk).set({
+                      email: targetEmail.toLowerCase(),
+                      uid: cred.user.uid,
+                      phone: cSnap.data().phone,
+                      updatedAt: new Date().toISOString()
+                    }).catch(console.error);
+                  });
+                }
+              }).catch(console.error);
+            }
+
             setLoading(false);
             showToast('أهلًا بك من جديد!', 'success');
             navigate('account');
@@ -2099,14 +2155,16 @@ function handleAuthSubmit(e, mode) {
       };
 
       if (isEmail) {
-        performLogin(rawIdentifier);
+        performLogin(rawIdentifier.toLowerCase());
       } else {
-        // Query phone_lookup
+        // Query phone_lookup with all normalized variants
         if (db) {
-          db.collection('phone_lookup').doc(rawIdentifier).get()
-            .then(doc => {
-              if (doc.exists && doc.data() && doc.data().email) {
-                performLogin(doc.data().email);
+          const keys = getPhoneLookupKeys(rawIdentifier);
+          Promise.all(keys.map(k => db.collection('phone_lookup').doc(k).get().catch(() => null)))
+            .then(snapshots => {
+              const matchedSnap = snapshots.find(snap => snap && snap.exists && snap.data() && snap.data().email);
+              if (matchedSnap) {
+                performLogin(matchedSnap.data().email);
               } else {
                 setLoading(false);
                 showToast('لا يوجد حساب مسجل برقم الهاتف هذا.', 'error');
