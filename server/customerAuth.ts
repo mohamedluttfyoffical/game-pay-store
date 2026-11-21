@@ -43,13 +43,27 @@ export const customerAuthRouter = router({
     await createCustomerSession(customer, ctx.res);
     return publicCustomer(customer);
   }),
-  login: publicProcedure.input(z.object({ email: z.string().trim().toLowerCase().email().max(320), password: z.string().min(1).max(128) })).mutation(async ({ ctx, input }) => {
+  login: publicProcedure.input(z.object({
+    identifier: z.string().trim().min(1).max(320).optional(),
+    email: z.string().trim().max(320).optional(),
+    password: z.string().min(1).max(128),
+    rememberMe: z.boolean().optional(),
+  })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "قاعدة البيانات غير متاحة." });
-    const [customer] = await db.select().from(customers).where(eq(customers.email, input.email)).limit(1);
+    const rawIdentifier = (input.identifier || input.email || "").trim();
+    if (!rawIdentifier) throw new TRPCError({ code: "BAD_REQUEST", message: "يرجى إدخال البريد الإلكتروني أو رقم الهاتف." });
+    const isEmail = rawIdentifier.includes("@");
+    const [customer] = isEmail
+      ? await db.select().from(customers).where(eq(customers.email, rawIdentifier.toLowerCase())).limit(1)
+      : await db.select().from(customers).where(eq(customers.phone, rawIdentifier)).limit(1);
     if (!customer || !(await verifyPassword(input.password, customer))) throw new TRPCError({ code: "UNAUTHORIZED", message: "البريد الإلكتروني أو كلمة المرور غير صحيحين." });
     await db.update(customers).set({ lastSignedIn: new Date() }).where(eq(customers.id, customer.id));
-    await createCustomerSession(customer, ctx.res);
+    if (input.rememberMe !== undefined) {
+      await createCustomerSession(customer, ctx.res, input.rememberMe);
+    } else {
+      await createCustomerSession(customer, ctx.res);
+    }
     return publicCustomer(customer);
   }),
   logout: publicProcedure.mutation(async ({ ctx }) => {

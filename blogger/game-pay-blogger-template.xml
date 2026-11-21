@@ -1935,6 +1935,8 @@ function handleTopupSubmit(e) {
 // 9. AUTH (LOGIN & REGISTER) VIEW
 function viewAuth(mode = 'login') {
   const isRegister = mode === 'register';
+  const rememberedId = (!isRegister && localStorage.getItem('gp_remember_identifier')) || '';
+  const isRemembered = !isRegister && (localStorage.getItem('gp_remember_me') !== 'false');
 
   return `
     <main dir="rtl" class="min-h-screen bg-[#07111f] p-4 text-slate-100 md:p-8">
@@ -1979,11 +1981,6 @@ function viewAuth(mode = 'login') {
 
           <span class="eyebrow">${isRegister ? 'حساب جديد' : 'تسجيل الدخول'}</span>
           <h2 class="mt-4 text-3xl font-black text-white">${isRegister ? 'أنشئ حسابك' : 'مرحبًا بعودتك'}</h2>
-          ${!isRegister ? `
-            <p class="mt-3 text-sm leading-7 text-slate-400">
-              أدخل بيانات حسابك الخاصة بـ Game Pay للمتابعة.
-            </p>
-          ` : ''}
 
           <form onsubmit="handleAuthSubmit(event, '${mode}')" class="mt-8 grid gap-4">
             ${isRegister ? `
@@ -1995,12 +1992,21 @@ function viewAuth(mode = 'login') {
               </label>
             ` : ''}
 
-            <label class="field-label">البريد الإلكتروني
-              <div class="relative">
-                <i data-lucide="mail" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
-                <input id="authEmail" required type="email" placeholder="name@example.com" class="field-input pr-10" />
-              </div>
-            </label>
+            ${isRegister ? `
+              <label class="field-label">البريد الإلكتروني
+                <div class="relative">
+                  <i data-lucide="mail" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
+                  <input id="authEmail" required type="email" placeholder="name@example.com" class="field-input pr-10" />
+                </div>
+              </label>
+            ` : `
+              <label class="field-label">البريد الإلكتروني أو رقم الهاتف
+                <div class="relative">
+                  <i data-lucide="mail" class="absolute right-3 top-3.5 h-4 w-4 text-slate-500"></i>
+                  <input id="authEmail" required type="text" value="${rememberedId}" placeholder="name@example.com أو 01xxxxxxxxx" class="field-input pr-10" />
+                </div>
+              </label>
+            `}
 
             ${isRegister ? `
               <label class="field-label">رقم الهاتف
@@ -2017,6 +2023,15 @@ function viewAuth(mode = 'login') {
                 <input id="authPassword" required minlength="8" type="password" placeholder="8 أحرف على الأقل" class="field-input pr-10" />
               </div>
             </label>
+
+            ${!isRegister ? `
+              <div class="flex items-center justify-between mt-1">
+                <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-300">
+                  <input id="authRememberMe" type="checkbox" ${isRemembered ? 'checked' : ''} class="h-4 w-4 rounded border-white/20 bg-white/5 text-cyan-400 focus:ring-cyan-400 cursor-pointer" />
+                  <span>تذكرني</span>
+                </label>
+              </div>
+            ` : ''}
 
             ${isRegister ? `
               <label class="field-label">تأكيد كلمة المرور
@@ -2060,14 +2075,15 @@ function viewAuth(mode = 'login') {
 
 function handleAuthSubmit(e, mode) {
   e.preventDefault();
-  const email = document.getElementById('authEmail')?.value.trim();
+  const rawIdentifier = (document.getElementById('authEmail')?.value || '').trim();
   const password = document.getElementById('authPassword')?.value;
-  const name = document.getElementById('authName')?.value.trim() || email.split('@')[0];
+  const name = document.getElementById('authName')?.value.trim() || rawIdentifier.split('@')[0];
   const phone = document.getElementById('authPhone')?.value.trim() || '';
   const confirmPassword = document.getElementById('authConfirmPassword')?.value;
   const termsChecked = document.getElementById('authTerms')?.checked;
+  const rememberMe = document.getElementById('authRememberMe')?.checked ?? true;
 
-  if (!email || !password) return;
+  if (!rawIdentifier || !password) return;
 
   if (mode === 'register') {
     if (password !== confirmPassword) {
@@ -2099,10 +2115,10 @@ function handleAuthSubmit(e, mode) {
 
   if (isFirebaseActive && auth) {
     if (mode === 'register') {
-      auth.createUserWithEmailAndPassword(email, password)
+      auth.createUserWithEmailAndPassword(rawIdentifier, password)
         .then(cred => {
           cred.user.updateProfile({ displayName: name }).catch(console.error);
-          const userObj = { uid: cred.user.uid, name, email, phone };
+          const userObj = { uid: cred.user.uid, name, email: rawIdentifier, phone };
           Store.user = userObj;
           Store.saveUser();
 
@@ -2112,7 +2128,7 @@ function handleAuthSubmit(e, mode) {
               id: cred.user.uid,
               uid: cred.user.uid,
               name,
-              email,
+              email: rawIdentifier,
               phone,
               role: 'customer',
               termsAccepted: true,
@@ -2125,6 +2141,15 @@ function handleAuthSubmit(e, mode) {
               balance: 0.00,
               updatedAt: new Date().toISOString()
             }).catch(console.error);
+
+            // Save phone lookup for phone-based login
+            if (phone) {
+              db.collection('phone_lookup').doc(phone).set({
+                email: rawIdentifier.toLowerCase(),
+                uid: cred.user.uid,
+                createdAt: new Date().toISOString()
+              }).catch(console.error);
+            }
           }
 
           attachUserListeners(cred.user.uid);
@@ -2141,31 +2166,76 @@ function handleAuthSubmit(e, mode) {
           showToast(msg, 'error');
         });
     } else {
-      auth.signInWithEmailAndPassword(email, password)
-        .then(cred => {
-          const userObj = { uid: cred.user.uid, name: cred.user.displayName || email.split('@')[0], email };
-          Store.user = userObj;
-          Store.saveUser();
-          attachUserListeners(cred.user.uid);
-          setLoading(false);
-          showToast('أهلًا بك من جديد!', 'success');
-          navigate('account');
-        })
-        .catch(err => {
-          setLoading(false);
-          let msg = err.message;
-          if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-            msg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
-          } else if (err.code === 'auth/too-many-requests') {
-            msg = 'محاولات دخول كثيرة، يرجى الانتظار قليلاً ثم المحاولة ثانية.';
-          }
-          showToast(msg, 'error');
-        });
+      // Login mode: handle Remember Me
+      if (rememberMe) {
+        localStorage.setItem('gp_remember_identifier', rawIdentifier);
+        localStorage.setItem('gp_remember_me', 'true');
+      } else {
+        localStorage.removeItem('gp_remember_identifier');
+        localStorage.setItem('gp_remember_me', 'false');
+      }
+
+      // Set persistence based on rememberMe
+      if (firebase && firebase.auth && firebase.auth.Auth) {
+        const persistence = rememberMe
+          ? firebase.auth.Auth.Persistence.LOCAL
+          : firebase.auth.Auth.Persistence.SESSION;
+        auth.setPersistence(persistence).catch(console.error);
+      }
+
+      // Check if identifier is email or phone number
+      const isEmail = rawIdentifier.includes('@');
+
+      const performLogin = (targetEmail) => {
+        auth.signInWithEmailAndPassword(targetEmail, password)
+          .then(cred => {
+            const userObj = { uid: cred.user.uid, name: cred.user.displayName || targetEmail.split('@')[0], email: targetEmail };
+            Store.user = userObj;
+            Store.saveUser();
+            attachUserListeners(cred.user.uid);
+            setLoading(false);
+            showToast('أهلًا بك من جديد!', 'success');
+            navigate('account');
+          })
+          .catch(err => {
+            setLoading(false);
+            let msg = err.message;
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+              msg = 'البريد الإلكتروني أو رقم الهاتف أو كلمة المرور غير صحيحة.';
+            } else if (err.code === 'auth/too-many-requests') {
+              msg = 'محاولات دخول كثيرة، يرجى الانتظار قليلاً ثم المحاولة ثانية.';
+            }
+            showToast(msg, 'error');
+          });
+      };
+
+      if (isEmail) {
+        performLogin(rawIdentifier);
+      } else {
+        // Query phone_lookup
+        if (db) {
+          db.collection('phone_lookup').doc(rawIdentifier).get()
+            .then(doc => {
+              if (doc.exists && doc.data() && doc.data().email) {
+                performLogin(doc.data().email);
+              } else {
+                setLoading(false);
+                showToast('لا يوجد حساب مسجل برقم الهاتف هذا.', 'error');
+              }
+            })
+            .catch(err => {
+              console.error('Phone lookup error:', err);
+              performLogin(rawIdentifier);
+            });
+        } else {
+          performLogin(rawIdentifier);
+        }
+      }
     }
   } else {
     // Standalone fallback
     setTimeout(() => {
-      Store.user = { uid: 'user-' + Date.now(), name, email, phone };
+      Store.user = { uid: 'user-' + Date.now(), name, email: rawIdentifier, phone };
       Store.saveUser();
       setLoading(false);
       showToast(mode === 'register' ? 'تم إنشاء الحساب بنجاح!' : 'أهلًا بعودتك!', 'success');

@@ -12,8 +12,9 @@ export function isCustomer(actor: StoreActor | null): actor is Customer {
   return Boolean(actor && "passwordHash" in actor && !("mustChangePassword" in actor));
 }
 
-export function sessionCookieOptions() {
-  return { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: SESSION_DAYS * 24 * 60 * 60 * 1000 };
+export function sessionCookieOptions(rememberMe?: boolean) {
+  const days = rememberMe === true ? 30 : rememberMe === false ? 1 : SESSION_DAYS;
+  return { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: days * 24 * 60 * 60 * 1000 };
 }
 
 export function hashCustomerSessionToken(token: string) {
@@ -24,13 +25,18 @@ export function readCustomerSessionToken(cookieHeader?: string) {
   return cookieHeader?.match(new RegExp(`(?:^|;\\s*)${CUSTOMER_SESSION_COOKIE}=([^;]+)`))?.[1] ?? null;
 }
 
-export async function createCustomerSession(customer: Customer, res: { cookie: (name: string, value: string, options: ReturnType<typeof sessionCookieOptions>) => unknown }) {
+export async function createCustomerSession(
+  customer: Customer,
+  res: { cookie: (name: string, value: string, options: ReturnType<typeof sessionCookieOptions>) => unknown },
+  rememberMe?: boolean
+) {
   const db = await getDb();
   if (!db) throw new Error("تعذر إنشاء الجلسة حاليًا.");
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+  const days = rememberMe === true ? 30 : rememberMe === false ? 1 : SESSION_DAYS;
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   await db.insert(customerSessions).values({ customerId: customer.id, tokenHash: hashCustomerSessionToken(token), expiresAt });
-  res.cookie(CUSTOMER_SESSION_COOKIE, token, sessionCookieOptions());
+  res.cookie(CUSTOMER_SESSION_COOKIE, token, sessionCookieOptions(rememberMe));
 }
 
 export async function getCustomerFromSession(cookieHeader?: string): Promise<Customer | null> {

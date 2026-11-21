@@ -55,6 +55,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Phone lookup for login by phone number
+    match /phone_lookup/{phone} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdmin();
+    }
+
     // Customer Wallets - read own wallet, admin full access
     // Customer can initialize own wallet with balance 0
     // Customer can deduct balance during checkout payment

@@ -55,6 +55,19 @@ describe("customerAuth router", () => {
     expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ lastSignedIn: expect.any(Date) }));
     expect(mocks.createCustomerSession).toHaveBeenCalledWith(securedCustomer, expect.anything());
   });
+  it("allows login using phone number and forwards rememberMe to createCustomerSession", async () => {
+    const customerWithPhone = { ...customer, phone: "01012345678", passwordSalt: "0123456789abcdef", passwordHash: scryptSync("safe-pass1", "0123456789abcdef", 64).toString("hex") };
+    const where = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn(() => ({ where }));
+    const db = {
+      select: vi.fn(() => ({ from: () => ({ where: () => ({ limit: async () => [customerWithPhone] }) }) })),
+      update: vi.fn(() => ({ set: updateSet })),
+    };
+    mocks.getDb.mockResolvedValue(db);
+    const result = await customerAuthRouter.createCaller(context()).login({ identifier: "01012345678", password: "safe-pass1", rememberMe: true });
+    expect(result).toMatchObject({ id: customerWithPhone.id, email: customerWithPhone.email });
+    expect(mocks.createCustomerSession).toHaveBeenCalledWith(customerWithPhone, expect.anything(), true);
+  });
   it("verifies the current password, replaces its hash, and rotates customer sessions", async () => {
     const securedCustomer = { ...customer, passwordSalt: "0123456789abcdef", passwordHash: scryptSync("current-pass1", "0123456789abcdef", 64).toString("hex") };
     const where = vi.fn().mockResolvedValue(undefined);

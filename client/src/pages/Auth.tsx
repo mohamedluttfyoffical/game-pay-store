@@ -13,11 +13,21 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const creating = mode === "register";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("gp_remember_login");
+    if (saved) {
+      setIdentifier(saved);
+      setEmail(saved);
+    }
+  }, []);
 
   const register = trpc.customerAuth.register.useMutation({
     onSuccess: async customer => {
@@ -31,6 +41,12 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 
   const login = trpc.customerAuth.login.useMutation({
     onSuccess: async customer => {
+      const loginId = identifier.trim() || email.trim();
+      if (rememberMe && loginId) {
+        localStorage.setItem("gp_remember_login", loginId);
+      } else {
+        localStorage.removeItem("gp_remember_login");
+      }
       utils.customerAuth.me.setData(undefined, customer);
       await utils.customerAuth.me.invalidate();
       setLocation("/account");
@@ -50,7 +66,9 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       if (!termsAccepted) return toast.error("يرجى الموافقة على شروط وسياسة المنصة للمتابعة.");
       register.mutate({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
     } else {
-      login.mutate({ email: email.trim(), password });
+      const loginId = identifier.trim() || email.trim();
+      if (!loginId) return toast.error("يرجى إدخال البريد الإلكتروني أو رقم الهاتف.");
+      login.mutate({ identifier: loginId, email: loginId, password, rememberMe });
     }
   };
 
@@ -83,11 +101,6 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
           </button>
           <span className="eyebrow">{creating ? "حساب جديد" : "تسجيل الدخول"}</span>
           <h2 className="mt-4 text-3xl font-black text-white">{creating ? "أنشئ حسابك" : "مرحبًا بعودتك"}</h2>
-          {!creating && (
-            <p className="mt-3 text-sm leading-7 text-slate-400">
-              أدخل بيانات حسابك الخاصة بـ Game Pay للمتابعة.
-            </p>
-          )}
 
           <form onSubmit={submit} className="mt-8 grid gap-4">
             {creating && (
@@ -107,21 +120,42 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
               </label>
             )}
 
-            <label className="field-label">
-              البريد الإلكتروني
-              <div className="relative">
-                <Mail className="absolute right-3 top-3.5 h-4 w-4 text-slate-500" />
-                <input
-                  required
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="field-input pr-10"
-                />
-              </div>
-            </label>
+            {creating ? (
+              <label className="field-label">
+                البريد الإلكتروني
+                <div className="relative">
+                  <Mail className="absolute right-3 top-3.5 h-4 w-4 text-slate-500" />
+                  <input
+                    required
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="field-input pr-10"
+                  />
+                </div>
+              </label>
+            ) : (
+              <label className="field-label">
+                البريد الإلكتروني أو رقم الهاتف
+                <div className="relative">
+                  <Mail className="absolute right-3 top-3.5 h-4 w-4 text-slate-500" />
+                  <input
+                    required
+                    type="text"
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={e => {
+                      setIdentifier(e.target.value);
+                      setEmail(e.target.value);
+                    }}
+                    placeholder="name@example.com أو 01xxxxxxxxx"
+                    className="field-input pr-10"
+                  />
+                </div>
+              </label>
+            )}
 
             {creating && (
               <label className="field-label">
@@ -163,6 +197,20 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
                 </button>
               </div>
             </label>
+
+            {!creating && (
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={e => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-white/20 bg-white/5 text-cyan-400 focus:ring-cyan-400 cursor-pointer"
+                  />
+                  <span>تذكرني</span>
+                </label>
+              </div>
+            )}
 
             {creating && (
               <label className="field-label">
