@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://game-pay.manus.space/sitemap.xml

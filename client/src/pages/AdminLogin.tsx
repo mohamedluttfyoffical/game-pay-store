@@ -1,0 +1,18 @@
+import { GameMark } from "@/components/GameMark";
+import { trpc } from "@/lib/trpc";
+import { KeyRound, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useLocation } from "wouter";
+
+export default function AdminLogin() {
+  const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
+  const session = trpc.adminAuth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const login = trpc.adminAuth.login.useMutation({ onSuccess: async () => { await utils.adminAuth.me.invalidate(); toast.success("تم تسجيل دخول المسؤول"); setLocation("/admin"); }, onError: error => toast.error(error.message) });
+  useEffect(() => { if (!session.isLoading && session.data) setLocation("/admin"); }, [session.data, session.isLoading, setLocation]);
+  const submit = (event: FormEvent) => { event.preventDefault(); login.mutate({ email: email.trim(), password }); };
+  return <main dir="rtl" className="grid min-h-screen place-items-center bg-[#07111f] p-4 text-slate-100"><div className="grid w-full max-w-5xl overflow-hidden rounded-[30px] border border-cyan-300/15 bg-[#0c1829] shadow-[0_30px_100px_rgba(0,0,0,.45)] lg:grid-cols-[1fr_.9fr]"><section className="hidden min-h-[620px] flex-col justify-between bg-[radial-gradient(circle_at_65%_20%,rgba(34,211,238,.22),transparent_26%),linear-gradient(145deg,#102c4b,#07111f)] p-10 lg:flex"><GameMark /><div><span className="eyebrow">مساحة المسؤول</span><h1 className="mt-5 text-5xl font-black leading-tight">إدارة Game Pay<br /><span className="text-gradient">بصلاحية مستقلة.</span></h1><p className="mt-5 max-w-md leading-8 text-slate-300">هذه البوابة مخصّصة لإدارة المنتجات والطلبات ومحتوى الصفحة الرئيسية ولا ترتبط بحسابات العملاء أو دخول Manus.</p></div><div className="flex gap-3 rounded-2xl border border-cyan-300/15 bg-[#07111f]/35 p-4 text-sm leading-7 text-cyan-50"><ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-cyan-300" />في أول دخول، ستُطلب منك كلمة مرور جديدة قبل فتح لوحة الإدارة.</div></section><section className="flex min-h-[620px] flex-col justify-center p-7 sm:p-12"><button onClick={() => setLocation("/")} className="mb-10 self-start lg:hidden"><GameMark /></button><div className="mb-8"><span className="eyebrow">دخول المسؤول</span><h2 className="mt-4 text-3xl font-black text-white">تسجيل دخول الإدارة</h2><p className="mt-3 text-sm leading-7 text-slate-400">استخدم بيانات حساب المسؤول المستقل الخاص بـ Game Pay.</p></div><form onSubmit={submit} className="grid gap-4"><label className="field-label">البريد الإلكتروني<div className="relative"><Mail className="absolute right-3 top-3.5 h-4 w-4 text-slate-500" /><input required type="text" inputMode="email" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} placeholder="أدخل البريد الإلكتروني" className="field-input pr-10" /></div></label><label className="field-label">كلمة المرور<div className="relative"><LockKeyhole className="absolute right-3 top-3.5 h-4 w-4 text-slate-500" /><input required type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="أدخل كلمة المرور" className="field-input pr-10" /></div></label><button disabled={login.isPending} className="btn-primary mt-3 w-full py-3.5 disabled:opacity-50"><KeyRound className="h-4 w-4" />{login.isPending ? "جارٍ التحقق..." : "فتح لوحة الإدارة"}</button></form><p className="mt-6 rounded-xl border border-amber-300/15 bg-amber-300/[.04] p-4 text-xs leading-6 text-slate-400">لأمان المتجر، غيّر كلمة المرور الابتدائية فور تسجيل الدخول الأول.</p></section></div></main>;
+}

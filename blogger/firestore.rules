@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    // Games catalog - public read, admin write
+    match /games/{gameId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Products catalog - public read, admin write
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Homepage configuration & store assets - public read, admin write
+    match /homepage_configs/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /store_assets/{assetId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Coupons - public read active coupons, admin write
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Customers profile - read/write own profile, admin full access
+    match /customers/{customerId} {
+      allow read: if isOwner(customerId) || isAdmin();
+      allow create: if isOwner(customerId);
+      allow update: if isOwner(customerId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Customer Wallets - read own wallet, admin full access
+    // Customer can initialize own wallet with balance 0
+    // Customer can deduct balance during checkout payment
+    // Admin can credit/debit/manage all wallets
+    match /customer_wallets/{customerId} {
+      allow read: if isOwner(customerId) || isAdmin();
+      allow create: if isOwner(customerId) && 
+                       request.resource.data.customerId == customerId && 
+                       request.resource.data.balance == 0;
+      allow update: if isAdmin() || (
+                       isOwner(customerId) && 
+                       request.resource.data.customerId == customerId && 
+                       request.resource.data.balance <= resource.data.balance
+                    );
+      allow delete: if isAdmin();
+    }
+
+    // Wallet Topup Requests - read own requests or admin, create own request
+    match /wallet_topup_requests/{requestId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
+      allow create: if isAuthenticated() && 
+                       request.resource.data.customerId == request.auth.uid && 
+                       request.resource.data.amount > 0 &&
+                       request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    // Wallet Transactions - read own transactions or admin
+    match /wallet_transactions/{transactionId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
+      allow create: if isAdmin() || (isAuthenticated() && request.resource.data.customerId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // Orders - read own orders or admin, create authenticated or guest order
+    match /orders/{orderId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.get('customerId', '') == request.auth.uid);
+      allow create: if (!isAuthenticated() && (!('customerId' in request.resource.data) || request.resource.data.customerId == null)) ||
+                       (isAuthenticated() && (!('customerId' in request.resource.data) || request.resource.data.customerId == null || request.resource.data.customerId == request.auth.uid));
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Notifications - read/update own notifications
+    match /notifications/{notificationId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.get('customerId', '') == request.auth.uid);
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.get('customerId', '') == request.auth.uid);
+      allow create, delete: if isAdmin();
+    }
+
+    // Admins registry - read own or admin, write only admin
+    match /admins/{adminId} {
+      allow read: if isOwner(adminId) || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}

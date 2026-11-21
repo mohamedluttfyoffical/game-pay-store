@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1787430495422,
+      "tag": "0000_sudden_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787430767601,
+      "tag": "0001_aromatic_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787431728997,
+      "tag": "0002_tidy_roxanne_simpson",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1787432860579,
+      "tag": "0003_icy_vulcan",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1787477249982,
+      "tag": "0004_uneven_silver_centurion",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1787477337819,
+      "tag": "0005_glorious_beyonder",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787492879309,
+      "tag": "0006_big_landau",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787493882957,
+      "tag": "0007_great_ravenous",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1787502038045,
+      "tag": "0008_thin_redwing",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1787563857608,
+      "tag": "0009_wild_jigsaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1787572615965,
+      "tag": "0010_tan_cloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1787572660884,
+      "tag": "0011_equal_khan",
+      "breakpoints": true
+    }
+  ]
+}

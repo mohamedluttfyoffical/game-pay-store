@@ -1,0 +1,15 @@
+import { StoreShell } from "@/components/StoreShell";
+import { fulfillmentLabel, formatPrice, paymentLabel } from "@/lib/store";
+import { trpc } from "@/lib/trpc";
+import { CheckCircle2, LockKeyhole, PackageOpen } from "lucide-react";
+import { useLocation, useRoute } from "wouter";
+
+export default function OrderSuccess() {
+  const [, params] = useRoute("/order-success/:reference");
+  const [, setLocation] = useLocation();
+  const order = trpc.orders.byReference.useQuery({ reference: params?.reference ?? "" });
+  if (order.isLoading) return <StoreShell><div className="container py-20"><div className="h-80 animate-pulse rounded-3xl bg-white/[.05]" /></div></StoreShell>;
+  if (!order.data) return <StoreShell><div className="container py-20"><div className="empty-state"><h1>تعذر العثور على الطلب</h1><p>سجل الدخول بالحساب الذي أنشأ الطلب ثم حاول مجددًا.</p><button onClick={() => setLocation("/orders")} className="btn-primary mt-4">الذهاب إلى طلباتي</button></div></div></StoreShell>;
+  const data = order.data;
+  return <StoreShell><section className="container py-12"><div className="mx-auto max-w-3xl"><div className="rounded-[28px] border border-cyan-300/20 bg-gradient-to-b from-cyan-300/[.12] to-[#0d1929] p-7 text-center sm:p-10"><CheckCircle2 className="mx-auto h-14 w-14 text-cyan-300" /><h1 className="mt-5 text-3xl font-black text-white">تم إنشاء طلبك بنجاح</h1><p className="mt-3 text-sm leading-7 text-slate-300">رقم طلبك المرجعي: <strong className="text-cyan-200">{data.reference}</strong></p><div className="mt-6 flex flex-wrap justify-center gap-2"><span className="badge-neutral">{paymentLabel[data.paymentStatus]}</span><span className="badge-neutral">{fulfillmentLabel[data.fulfillmentStatus]}</span></div></div><div className="mt-6 rounded-2xl border border-white/[.08] bg-[#0d1929] p-5"><div className="flex items-center gap-2"><PackageOpen className="h-5 w-5 text-cyan-300" /><h2 className="font-bold text-white">تفاصيل المنتج</h2></div><div className="mt-5 space-y-4">{data.items.map(item => <div key={item.id} className="rounded-xl border border-white/[.06] bg-white/[.02] p-4"><div className="flex flex-wrap justify-between gap-3"><div><strong className="text-sm text-white">{item.productName}</strong><p className="mt-1 text-xs text-slate-500">الكمية: {item.quantity}</p></div><strong className="text-sm text-cyan-200">{formatPrice(Number(item.unitPrice) * item.quantity)}</strong></div>{item.deliverySnapshot ? <div className="mt-4 rounded-lg border border-cyan-300/15 bg-cyan-300/[.05] p-3 text-xs leading-6 text-slate-300"><span className="mb-1 flex items-center gap-1.5 font-bold text-cyan-200"><LockKeyhole className="h-3.5 w-3.5" />معلومات التسليم</span>{item.deliverySnapshot}</div> : <p className="mt-4 text-xs leading-6 text-slate-500">تُعرض تفاصيل التسليم الحساسة بعد تأكيد الدفع والتحقق من الطلب.</p>}</div>)}</div><div className="mt-6 flex flex-wrap gap-3"><button onClick={() => setLocation("/orders")} className="btn-primary">عرض طلباتي</button><button onClick={() => setLocation("/store")} className="btn-secondary">العودة إلى المتجر</button></div></div></div></section></StoreShell>;
+}
