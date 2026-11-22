@@ -2,6 +2,8 @@
 // Uploads via Forge Server presigned URL to S3 (PUT direct).
 // Downloads return /manus-storage/{key} paths served via 307 redirect.
 
+import fs from "fs";
+import path from "path";
 import { ENV } from "./_core/env";
 
 function getForgeConfig() {
@@ -9,9 +11,7 @@ function getForgeConfig() {
   const forgeKey = ENV.forgeApiKey;
 
   if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY",
-    );
+    return null;
   }
 
   return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
@@ -33,9 +33,29 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
-  const { forgeUrl, forgeKey } = getForgeConfig();
+  const forgeConfig = getForgeConfig();
   const key = appendHashSuffix(normalizeKey(relKey));
 
+  // Local storage fallback when Forge is not configured
+  if (!forgeConfig) {
+    const cleanFileName = key.replace(/[/\\?%*:|"<>]/g, "_");
+    const uploadsDir = path.resolve(import.meta.dirname, "../..", "client", "public", "uploads");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const distUploadsDir = path.resolve(import.meta.dirname, "../..", "dist", "public", "uploads");
+    if (!fs.existsSync(distUploadsDir)) {
+      try { fs.mkdirSync(distUploadsDir, { recursive: true }); } catch {}
+    }
+    const filePath = path.join(uploadsDir, cleanFileName);
+    const distFilePath = path.join(distUploadsDir, cleanFileName);
+    const buffer = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
+    fs.writeFileSync(filePath, buffer);
+    try { fs.writeFileSync(distFilePath, buffer); } catch {}
+    return { key, url: `/uploads/${cleanFileName}` };
+  }
+
+  const { forgeUrl, forgeKey } = forgeConfig;
   // 1. Get presigned PUT URL from Forge
   const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
   presignUrl.searchParams.set("path", key);
