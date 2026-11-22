@@ -20,7 +20,20 @@ while ($true) {
         $status = git status --porcelain
         if ($status) {
             $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-            Write-Host "[$timestamp] Changes detected. Staging and committing..." -ForegroundColor Yellow
+            Write-Host "[$timestamp] Changes detected..." -ForegroundColor Yellow
+            
+            # Rebuild Blogger theme if client or blogger code changed
+            if (($status -match "client/") -or ($status -match "blogger/")) {
+                Write-Host "[$timestamp] Updating Blogger template..." -ForegroundColor Cyan
+                if ($status -match "client/src/index.css") {
+                    npx vite build | Out-Null
+                }
+                if (Test-Path "blogger/build-theme.cjs") {
+                    node blogger/build-theme.cjs | Out-Null
+                }
+            }
+
+            Write-Host "[$timestamp] Staging and committing..." -ForegroundColor Yellow
             git add .
             git commit -m "Auto-sync update: $timestamp"
             
