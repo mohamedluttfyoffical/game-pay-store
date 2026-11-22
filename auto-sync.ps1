@@ -1,4 +1,4 @@
-﻿# Auto-sync PowerShell script for continuous monitoring and synchronization
+# Auto-sync PowerShell script for continuous monitoring and synchronization
 param (
     [int]$IntervalSeconds = 10
 )
