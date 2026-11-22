@@ -3,6 +3,11 @@ param (
     [int]$IntervalSeconds = 10
 )
 
+# Ensure the script runs in its own directory
+if ($PSScriptRoot) {
+    Set-Location -Path $PSScriptRoot
+}
+
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host "       Game Pay - مراقب المزامنة التلقائية مع GitHub     " -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
