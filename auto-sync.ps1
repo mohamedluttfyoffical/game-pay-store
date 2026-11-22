@@ -1,4 +1,4 @@
-# Auto-sync PowerShell script for continuous monitoring and synchronization
+﻿# Auto-sync PowerShell script for continuous monitoring and synchronization
 param (
     [int]$IntervalSeconds = 10
 )
@@ -27,7 +27,7 @@ while ($true) {
             git commit -m "Auto-sync update: $timestamp"
             
             # محاولة الرفع، وإذا كان هناك تعديلات على السيرفر نجلبها أولاً
-            $pushResult = git push origin main 2>&1
+            git push origin main
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "[$timestamp] جاري سحب التحديثات من GitHub أولاً..." -ForegroundColor Cyan
                 git pull --rebase origin main
