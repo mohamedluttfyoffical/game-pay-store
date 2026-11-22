@@ -8,3 +8,5 @@
 - يرفع التعديلات فوراً وبشكل تلقائي إلى المستودع: `https://github.com/mohamedluttfyoffical/game-pay-store`.
 
 <!-- Auto-sync test verified -->
+
+<!-- Live auto-sync active -->
