@@ -1587,9 +1587,13 @@ function viewAccount() {
       <div class="rounded-[28px] border border-cyan-300/15 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,.12),transparent_35%),#0d1929] p-6 md:p-8">
         <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div class="grid h-24 w-24 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-blue-500 text-2xl font-black text-slate-950">
-              ${(u.name || 'G').charAt(0).toUpperCase()}
-            </div>
+            ${u.avatarUrl ? `
+              <img src="${u.avatarUrl}" alt="${u.name || 'User'}" class="h-24 w-24 rounded-2xl border border-cyan-300/20 object-cover" />
+            ` : `
+              <div class="grid h-24 w-24 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-blue-500 text-2xl font-black text-slate-950">
+                ${(u.name || 'G').charAt(0).toUpperCase()}
+              </div>
+            `}
             <div>
               <span class="eyebrow">حساب Game Pay</span>
               <h1 class="mt-3 text-3xl font-black text-white">مرحبًا، ${u.name || 'العميل'}</h1>
@@ -1623,11 +1627,21 @@ function viewAccount() {
       ${accountActiveTab === 'profile' ? `
         <section class="mt-7 grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
           <aside class="rounded-2xl border border-white/[.08] bg-[#0d1929] p-6 text-center">
-            <div class="grid h-24 w-24 mx-auto place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-blue-500 text-2xl font-black text-slate-950">
-              ${(u.name || 'G').charAt(0).toUpperCase()}
+            <div class="relative mx-auto w-fit">
+              ${u.avatarUrl ? `
+                <img src="${u.avatarUrl}" alt="${u.name || 'User'}" class="h-24 w-24 rounded-2xl border border-cyan-300/20 object-cover" />
+              ` : `
+                <div class="grid h-24 w-24 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-blue-500 text-2xl font-black text-slate-950">
+                  ${(u.name || 'G').charAt(0).toUpperCase()}
+                </div>
+              `}
+              <label class="absolute -bottom-2 -left-2 grid h-9 w-9 cursor-pointer place-items-center rounded-xl bg-cyan-300 text-slate-950 shadow-lg hover:bg-cyan-200 transition">
+                <i data-lucide="camera" class="h-4 w-4"></i>
+                <input type="file" accept="image/jpeg,image/png,image/webp" onchange="handleBloggerAvatarChange(event)" class="sr-only" />
+              </label>
             </div>
             <h2 class="mt-5 font-bold text-white">صورة الحساب</h2>
-            <p class="mt-2 text-xs leading-6 text-slate-500">تم تعيين الأفاتار الافتراضي للحساب بنجاح.</p>
+            <p class="mt-2 text-xs leading-6 text-slate-500">JPG أو PNG أو WEBP، اضغط على أيقونة الكاميرا لرفع صورة شخصية.</p>
           </aside>
           <div class="rounded-2xl border border-white/[.08] bg-[#0d1929] p-6">
             <h2 class="text-lg font-bold text-white">بياناتك الشخصية</h2>
